@@ -393,6 +393,12 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
             {
                 add_device_grouped_conv3d_fwd_xdl_gndhwc_gkzyxc_gndhwk_f32_instances(op_ptrs);
             }
+            if constexpr(is_same_v<InDataType, float> && is_same_v<WeiDataType, float> &&
+                         is_same_v<OutDataType, float> && is_same_v<AComputeType, XF32> &&
+                         is_same_v<BComputeType, XF32>)
+            {
+                add_device_grouped_conv3d_fwd_xdl_gndhwc_gkzyxc_gndhwk_f32_xf32_instances(op_ptrs);
+            }
 #endif
 #ifdef CK_ENABLE_FP16
             if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
@@ -443,6 +449,12 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 add_device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f32_mem_inter_instances(
                     op_ptrs);
             }
+            if constexpr(is_same_v<InDataType, float> && is_same_v<WeiDataType, float> &&
+                         is_same_v<OutDataType, float> && is_same_v<AComputeType, XF32> &&
+                         is_same_v<BComputeType, XF32>)
+            {
+                add_device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances(op_ptrs);
+            }
 #endif
 
 #ifdef CK_ENABLE_FP8
@@ -469,7 +481,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 add_device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_bf8_instances(op_ptrs);
             }
 #endif
-#if(defined(CK_ENABLE_FP8) && defined(CK_ENABLE_BF8))
+#if (defined(CK_ENABLE_FP8) && defined(CK_ENABLE_BF8))
             if constexpr(is_same_v<InDataType, ck::f8_t> && is_same_v<WeiDataType, ck::bf8_t> &&
                          is_same_v<OutDataType, ck::f8_t> && is_same_v<AComputeType, ck::f8_t> &&
                          is_same_v<BComputeType, ck::bf8_t>)
@@ -477,7 +489,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 add_device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f8_bf8_instances(op_ptrs);
             }
 #endif
-#if(defined(CK_ENABLE_FP8) && defined(CK_ENABLE_BF8))
+#if (defined(CK_ENABLE_FP8) && defined(CK_ENABLE_BF8))
             if constexpr(is_same_v<InDataType, ck::bf8_t> && is_same_v<WeiDataType, ck::f8_t> &&
                          is_same_v<OutDataType, ck::f8_t> && is_same_v<AComputeType, ck::bf8_t> &&
                          is_same_v<BComputeType, ck::f8_t>)
@@ -552,6 +564,12 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                     op_ptrs);
                 add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f32_mem_inter_instances(
                     op_ptrs);
+            }
+            if constexpr(is_same_v<InDataType, float> && is_same_v<WeiDataType, float> &&
+                         is_same_v<OutDataType, float> && is_same_v<AComputeType, XF32> &&
+                         is_same_v<BComputeType, XF32>)
+            {
+                add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f32_xf32_instances(op_ptrs);
             }
 #endif
 #ifdef CK_ENABLE_FP16

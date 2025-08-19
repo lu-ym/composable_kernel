@@ -433,6 +433,21 @@ void add_device_grouped_conv3d_fwd_xdl_gndhwc_gkzyxc_gndhwk_f32_instances(
                                                                 PassThrough,
                                                                 PassThrough,
                                                                 PassThrough>>>& instances);
+void add_device_grouped_conv3d_fwd_xdl_gndhwc_gkzyxc_gndhwk_f32_xf32_instances(
+    std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
+                                                                GNDHWC,
+                                                                GKZYXC,
+                                                                Empty_Tuple,
+                                                                GNDHWK,
+                                                                F32,
+                                                                F32,
+                                                                Empty_Tuple,
+                                                                F32,
+                                                                PassThrough,
+                                                                PassThrough,
+                                                                PassThrough,
+                                                                XF32,
+                                                                XF32>>>& instances);
 #endif
 
 #ifdef CK_ENABLE_INT8
@@ -558,6 +573,22 @@ void add_device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f32_instances(
                                                                 PassThrough,
                                                                 PassThrough,
                                                                 PassThrough>>>& instances);
+
+void add_device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances(
+    std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
+                                                                NDHWGC,
+                                                                GKZYXC,
+                                                                Empty_Tuple,
+                                                                NDHWGK,
+                                                                F32,
+                                                                F32,
+                                                                Empty_Tuple,
+                                                                F32,
+                                                                PassThrough,
+                                                                PassThrough,
+                                                                PassThrough,
+                                                                XF32,
+                                                                XF32>>>& instances);
 
 void add_device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f32_16x16_instances(
     std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
@@ -717,6 +748,22 @@ void add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f32_instances(
                                                                 PassThrough,
                                                                 PassThrough,
                                                                 PassThrough>>>& instances);
+
+void add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f32_xf32_instances(
+    std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
+                                                                NGCDHW,
+                                                                GKCZYX,
+                                                                Empty_Tuple,
+                                                                NGKDHW,
+                                                                F32,
+                                                                F32,
+                                                                Empty_Tuple,
+                                                                F32,
+                                                                PassThrough,
+                                                                PassThrough,
+                                                                PassThrough,
+                                                                XF32,
+                                                                XF32>>>& instances);
 
 void add_device_grouped_conv3d_fwd_xdl_ngcdhw_gkczyx_ngkdhw_f32_16x16_instances(
     std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,

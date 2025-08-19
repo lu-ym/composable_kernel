@@ -959,11 +959,20 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         void Print() const
         {
+            std::cout << "AComputeDataType: " << get_type_name<AComputeDataType>()
+                      << "; BComputeDataType: " << get_type_name<BComputeDataType>()
+                      << "; EDataType: " << get_type_name<EDataType>() << std::endl;
+
             std::cout << "A[M, K]: " << a_grid_desc_m_k_ << std::endl;
             std::cout << "B[N, K]: " << b_grid_desc_n_k_ << std::endl;
             static_for<0, NumDTensor, 1>{}(
                 [&](auto i) { std::cout << "Ds[M, N]: " << ds_grid_desc_m_n_[i] << std::endl; });
             std::cout << "E[M, N]: " << e_grid_desc_m_n_ << std::endl;
+
+            std::cout << "a grid desc" << a_grid_desc_ak0_m_ak1_ << std::endl;
+            std::cout << "b grid desc" << b_grid_desc_bk0_n_bk1_ << std::endl;
+            std::cout << "e grid desc" << e_grid_desc_mblock_mperblock_nblock_nperblock_
+                      << std::endl;
         }
 
         //  private:
@@ -1034,6 +1043,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         float RunGemm(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
+            ::std::cout << __FILE__ << ":" << __LINE__
+                        << " DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle" << std::endl;
             if(stream_config.log_level_ > 0)
             {
                 arg.Print();
@@ -1153,7 +1164,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             isMultiA,
                             isMultiB,
                             CTranspose>;
-
                         return launch_and_time_kernel(
                             stream_config,
                             kernel,
@@ -1235,7 +1245,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
             float avg_time = 0.f;
-
             if constexpr(NeedTransposeKernel)
             {
                 const index_t a_grid_size =

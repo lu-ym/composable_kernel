@@ -111,8 +111,9 @@ template <typename ALayout,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
-          typename ComputeTypeA = CDataType,
-          typename ComputeTypeB = ComputeTypeA>
+          typename ComputeTypeA    = CDataType,
+          typename ComputeTypeB    = ComputeTypeA,
+          typename ComputeTypeGemm = CDataType>
 struct ReferenceGemm : public device::BaseOperator
 {
     // Argument

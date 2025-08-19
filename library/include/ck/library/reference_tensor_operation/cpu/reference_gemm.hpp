@@ -21,8 +21,9 @@ template <typename ADataType,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
-          typename ComputeTypeA = CDataType,
-          typename ComputeTypeB = ComputeTypeA>
+          typename ComputeTypeA    = CDataType,
+          typename ComputeTypeB    = ComputeTypeA,
+          typename ComputeTypeGemm = CDataType>
 struct ReferenceGemm : public device::BaseOperator
 {
     // Argument
@@ -136,8 +137,25 @@ struct ReferenceGemm : public device::BaseOperator
                         arg.b_element_op_(v_b, arg.b_k_n_(k, n));
                     }
 
-                    v_acc +=
-                        ck::type_convert<AccDataType>(v_a) * ck::type_convert<AccDataType>(v_b);
+                    if constexpr(ck::is_same_v<ComputeTypeGemm, ck::xf32_t>)
+                    {
+                        auto truncate_float_to_xfloat32 = [](float f) {
+                            union
+                            {
+                                float fp32;
+                                uint32_t int32;
+                            } u = {f};
+
+                            u.int32 = u.int32 & 0xffffe000;
+                            return u.fp32;
+                        };
+                        v_acc += truncate_float_to_xfloat32(v_a) * truncate_float_to_xfloat32(v_b);
+                    }
+                    else
+                    {
+                        v_acc +=
+                            ck::type_convert<AccDataType>(v_a) * ck::type_convert<AccDataType>(v_b);
+                    }
                 }
 
                 CDataType v_c{0};

@@ -38,8 +38,9 @@ template <index_t BlockSize,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          typename ComputeTypeA = FloatA,
-          typename ComputeTypeB = FloatB>
+          typename ComputeTypeA    = FloatA,
+          typename ComputeTypeB    = FloatB,
+          typename ComputeTypeGemm = FloatAcc>
 struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
 {
     static constexpr auto I0 = Number<0>{};
@@ -63,8 +64,14 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
     static constexpr index_t NWaves   = NPerBlock / (NRepeat * NPerXDL);
     static constexpr index_t WaveSize = BlockSize / MWaves / NWaves;
 
-    static constexpr auto xdlops_gemm =
-        XdlopsGemm<ComputeTypeA, MPerXDL, NPerXDL, KPack, ComputeTypeB>{};
+    static constexpr auto xdlops_gemm = XdlopsGemm<ComputeTypeA,
+                                                   MPerXDL,
+                                                   NPerXDL,
+                                                   KPack,
+                                                   ComputeTypeB,
+                                                   false,
+                                                   false,
+                                                   ComputeTypeGemm>{};
 
     static constexpr index_t KPerThread = KPerBlock / xdlops_gemm.K0PerXdlops;
 
@@ -399,9 +406,10 @@ template <index_t BlockSize,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-          typename ComputeTypeA  = FloatA,
-          typename ComputeTypeB  = FloatB,
-          index_t NumMacClusters = CK_EXPERIMENTAL_INTER_WAVE_SCHEDULING_MAC_CLUSTERS>
+          typename ComputeTypeA    = FloatA,
+          typename ComputeTypeB    = FloatB,
+          index_t NumMacClusters   = CK_EXPERIMENTAL_INTER_WAVE_SCHEDULING_MAC_CLUSTERS,
+          typename ComputeTypeGemm = FloatAcc>
 struct BlockwiseGemmXdlopsInterwave_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
     : public BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<BlockSize,
                                                                  FloatA,
@@ -415,7 +423,8 @@ struct BlockwiseGemmXdlopsInterwave_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                                                                  NRepeat,
                                                                  KPack,
                                                                  ComputeTypeA,
-                                                                 ComputeTypeB>
+                                                                 ComputeTypeB,
+                                                                 ComputeTypeGemm>
 {
     using Base = BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<BlockSize,
                                                                      FloatA,
@@ -429,7 +438,8 @@ struct BlockwiseGemmXdlopsInterwave_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                                                                      NRepeat,
                                                                      KPack,
                                                                      ComputeTypeA,
-                                                                     ComputeTypeB>;
+                                                                     ComputeTypeB,
+                                                                     ComputeTypeGemm>;
 
 #if CK_EXPERIMENTAL_INTER_WAVE_SCHEDULING
     using Base::a_block_desc_m0_m1_m2_k;
@@ -600,8 +610,9 @@ template <index_t BlockSize,
           index_t NRepeat,
           index_t KPack,
           LoopScheduler LoopSched,
-          typename ComputeTypeA = FloatA,
-          typename ComputeTypeB = FloatB>
+          typename ComputeTypeA    = FloatA,
+          typename ComputeTypeB    = FloatB,
+          typename ComputeTypeGemm = FloatAcc>
 constexpr auto BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_Selector()
 {
     if constexpr(LoopSched == LoopScheduler::Default)
@@ -618,23 +629,27 @@ constexpr auto BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_Selector()
                                                                    NRepeat,
                                                                    KPack,
                                                                    ComputeTypeA,
-                                                                   ComputeTypeB>{};
+                                                                   ComputeTypeB,
+                                                                   ComputeTypeGemm>{};
     }
     else if constexpr(LoopSched == LoopScheduler::Interwave)
     {
-        return BlockwiseGemmXdlopsInterwave_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<BlockSize,
-                                                                            FloatA,
-                                                                            FloatB,
-                                                                            FloatAcc,
-                                                                            AK0MK1BlockDesc,
-                                                                            BK0NK1BlockDesc,
-                                                                            MPerXDL,
-                                                                            NPerXDL,
-                                                                            MRepeat,
-                                                                            NRepeat,
-                                                                            KPack,
-                                                                            ComputeTypeA,
-                                                                            ComputeTypeB>{};
+        return BlockwiseGemmXdlopsInterwave_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<
+            BlockSize,
+            FloatA,
+            FloatB,
+            FloatAcc,
+            AK0MK1BlockDesc,
+            BK0NK1BlockDesc,
+            MPerXDL,
+            NPerXDL,
+            MRepeat,
+            NRepeat,
+            KPack,
+            ComputeTypeA,
+            ComputeTypeB,
+            CK_EXPERIMENTAL_INTER_WAVE_SCHEDULING_MAC_CLUSTERS,
+            ComputeTypeGemm>{};
     }
 };
 

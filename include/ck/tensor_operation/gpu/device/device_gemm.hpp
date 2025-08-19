@@ -17,7 +17,8 @@ template <typename ALayout,
           typename CDataType,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
-          typename CElementwiseOperation>
+          typename CElementwiseOperation,
+          typename ComputeDataType = CDataType>
 struct DeviceGemm : public BaseOperator
 {
     virtual std::unique_ptr<BaseArgument>

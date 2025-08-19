@@ -56,7 +56,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
             e_grid_desc_mblock_mperblock_nblock_nperblock,
         const Block2ETileMap block_2_etile_map)
 {
-#if(defined(__gfx90a__) || defined(__gfx94__))
+#if (defined(__gfx90a__) || defined(__gfx94__))
     __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
 
     GridwiseGemm::template Run<HasMainKBlockLoop>(p_a_grid,
@@ -140,7 +140,8 @@ template <typename ALayout,
           index_t CDEShuffleBlockTransferScalarPerVector_NPerBlock,
           LoopScheduler LoopSched,
           PipelineVersion PipelineVer = PipelineVersion::v4,
-          typename BComputeDataType   = AComputeDataType_>
+          typename BComputeDataType   = AComputeDataType_,
+          typename GemmDataType       = EDataType>
 struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
 {
     static constexpr index_t NumDTensor = DsDataType::Size();
@@ -566,7 +567,6 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
         // This forces m/n_block_data_idx_on_grid into SGPR.
         const index_t m_block_data_idx_on_grid =
             __builtin_amdgcn_readfirstlane(block_work_idx[I0] * MPerBlock);
-
         const index_t n_block_data_idx_on_grid =
             __builtin_amdgcn_readfirstlane(block_work_idx[I1] * NPerBlock);
 
@@ -638,7 +638,8 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
                                                          NPerXdl,
                                                          BComputeDataType,
                                                          is_single_rate_mfma,
-                                                         is_scale_mfma>::selected_mfma.k_per_blk);
+                                                         is_scale_mfma,
+                                                         GemmDataType>::selected_mfma.k_per_blk);
 
         auto blockwise_gemm = BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_Selector<
             BlockSize,
@@ -652,7 +653,10 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
             MXdlPerWave,
             NXdlPerWave,
             KPack,
-            LoopSched>();
+            LoopSched,
+            AComputeDataType_,
+            BComputeDataType,
+            GemmDataType>();
 
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 
@@ -735,19 +739,18 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
 
             constexpr auto c_block_desc_m0_n0_m1_n1_m2_m3_m4_n2 = transform_tensor_descriptor(
                 c_shuffle_block_desc_mblock_mperblock_nblock_nperblock,
-                make_tuple(
-                    make_freeze_transform(I0),
-                    make_unmerge_transform(make_tuple(
-                        Number<CShuffleMXdlPerWavePerShuffle>{}, // M0 (MXdlPerWave) per shuffle
-                        M1,                                      // M1 = MWave
-                        M2,                                      // M2 * M3 * M4 = MPerXdl
-                        M3,
-                        M4)),
-                    make_freeze_transform(I0),
-                    make_unmerge_transform(make_tuple(
-                        Number<CShuffleNXdlPerWavePerShuffle>{}, // N0 (NXdlPerWave) per shuffle
-                        N1,                                      // N1 = NWave
-                        N2))),                                   // N2 = NPerXdl
+                make_tuple(make_freeze_transform(I0),
+                           make_unmerge_transform(make_tuple(
+                               Number<CShuffleMXdlPerWavePerShuffle>{}, // M0 (MXdlPerWave) per shuffle
+                               M1,                                      // M1 = MWave
+                               M2,                                      // M2 * M3 * M4 = MPerXdl
+                               M3,
+                               M4)),
+                           make_freeze_transform(I0),
+                           make_unmerge_transform(make_tuple(
+                               Number<CShuffleNXdlPerWavePerShuffle>{}, // N0 (NXdlPerWave) per shuffle
+                               N1,                                      // N1 = NWave
+                               N2))),                                   // N2 = NPerXdl
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
                 make_tuple(
                     Sequence<>{}, Sequence<0, 2, 4, 5, 6>{}, Sequence<>{}, Sequence<1, 3, 7>{}));

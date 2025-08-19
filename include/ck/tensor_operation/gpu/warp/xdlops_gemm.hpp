@@ -41,11 +41,11 @@ static constexpr bool scale_mfma_hw_support()
 
 enum struct MfmaInstr
 {
-    mfma_f32_32x32x1xf32 = 0,
-    mfma_f32_16x16x1xf32,
-    mfma_f32_4x4x1xf32,
-    mfma_f32_32x32x2xf32,
-    mfma_f32_16x16x4xf32,
+    mfma_f32_32x32x1f32 = 0,
+    mfma_f32_16x16x1f32,
+    mfma_f32_4x4x1f32,
+    mfma_f32_32x32x2f32,
+    mfma_f32_16x16x4f32,
     mfma_f32_32x32x4f16,
     mfma_f32_16x16x4f16,
     mfma_f32_4x4x4f16,
@@ -78,6 +78,8 @@ enum struct MfmaInstr
     mfma_f32_16x16x128f8f6f4,
     mfma_scale_f32_32x32x64f8f6f4,
     mfma_scale_f32_16x16x128f8f6f4,
+    mfma_f32_16x16x8xf32, // xf32
+    mfma_f32_32x32x4xf32,
     // gfx11
     wmma_f32_16x16x16_f16,
     wmma_f32_16x16x16_bf16,
@@ -98,7 +100,7 @@ template <MfmaInstr instr>
 struct mfma_type;
 
 template <>
-struct mfma_type<MfmaInstr::mfma_f32_32x32x1xf32>
+struct mfma_type<MfmaInstr::mfma_f32_32x32x1f32>
 {
     static constexpr index_t group_size          = 4;
     static constexpr index_t num_groups_per_blk  = 4;
@@ -120,7 +122,7 @@ struct mfma_type<MfmaInstr::mfma_f32_32x32x1xf32>
 };
 
 template <>
-struct mfma_type<MfmaInstr::mfma_f32_32x32x2xf32>
+struct mfma_type<MfmaInstr::mfma_f32_32x32x2f32>
 {
     static constexpr index_t group_size          = 4;
     static constexpr index_t num_groups_per_blk  = 4;
@@ -142,7 +144,7 @@ struct mfma_type<MfmaInstr::mfma_f32_32x32x2xf32>
 };
 
 template <>
-struct mfma_type<MfmaInstr::mfma_f32_16x16x4xf32>
+struct mfma_type<MfmaInstr::mfma_f32_16x16x4f32>
 {
     static constexpr index_t group_size          = 4;
     static constexpr index_t num_groups_per_blk  = 1;
@@ -164,7 +166,7 @@ struct mfma_type<MfmaInstr::mfma_f32_16x16x4xf32>
 };
 
 template <>
-struct mfma_type<MfmaInstr::mfma_f32_16x16x1xf32>
+struct mfma_type<MfmaInstr::mfma_f32_16x16x1f32>
 {
     static constexpr index_t group_size          = 4;
     static constexpr index_t num_groups_per_blk  = 1;
@@ -187,7 +189,7 @@ struct mfma_type<MfmaInstr::mfma_f32_16x16x1xf32>
 
 // treat 4x4x1 as a single-blk 4x64 mfma
 template <>
-struct mfma_type<MfmaInstr::mfma_f32_4x4x1xf32>
+struct mfma_type<MfmaInstr::mfma_f32_4x4x1f32>
 {
     static constexpr index_t group_size          = 4;
     static constexpr index_t num_groups_per_blk  = 1;
@@ -947,6 +949,70 @@ struct mfma_type<MfmaInstr::mfma_scale_f32_16x16x128f8f6f4>
     }
 };
 
+/**
+ * num_threads_per_blk == n_per_blk
+ * num_regs_per_blk * num_input_blks == m_per_blk
+ * num_regs_per_blk * wave_size == m_per_blk * n_per_blk
+ *
+ * group_size * num_groups_per_blk == num_regs_per_blk
+ *
+ * num_regs_per_blk is output(CD) register size which is determined by the instruction.
+ * k_per_blk(K1PerXdlops) is input(AB) register size which is determined by the instruction.
+ * group_size is corresponding to CD rows mapping. see: GetBeginOfThreadBlk()
+ *
+ * is_k_reduction = (k_per_blk == KPerXdlops) ？ false： true.
+ *
+ * if (is_k_reduction){
+ *      num_output_blks == 1;
+ * } else {
+ *      num_input_blks == num_output_blks;
+ * }
+ */
+template <>
+struct mfma_type<MfmaInstr::mfma_f32_16x16x8xf32>
+{
+    static constexpr index_t wave_size           = 64;        // fixed
+    static constexpr index_t m_per_blk           = 16;        // from the instruction
+    static constexpr index_t n_per_blk           = 16;        // from the instruction
+    static constexpr index_t num_threads_per_blk = n_per_blk; // 16
+    static constexpr index_t num_regs_per_blk    = m_per_blk * n_per_blk / wave_size; // 4
+    static constexpr index_t num_input_blks      = m_per_blk / num_regs_per_blk;      // 4
+    static constexpr index_t group_size          = 4;
+    static constexpr index_t num_groups_per_blk  = 1;
+    static constexpr index_t num_output_blks     = 1;
+    static constexpr index_t k_per_blk           = 2; //  k_per_blk(K1PerXdlops) should be 2.
+    static constexpr bool is_k_reduction         = true;
+
+    // AB register size : 2,  register size: 4
+    template <index_t MPerXdlops, index_t NPerXdlops, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_mfma_f32_16x16x8xf32<MPerXdlops, NPerXdlops>::Run(a, b, reg_c);
+    }
+};
+
+template <>
+struct mfma_type<MfmaInstr::mfma_f32_32x32x4xf32>
+{
+    static constexpr index_t wave_size           = 64;        // fixed
+    static constexpr index_t m_per_blk           = 32;        // from the instruction
+    static constexpr index_t n_per_blk           = 32;        // from the instruction
+    static constexpr index_t num_threads_per_blk = n_per_blk; // 32
+    static constexpr index_t num_regs_per_blk    = m_per_blk * n_per_blk / wave_size; // 16
+    static constexpr index_t num_input_blks      = m_per_blk / num_regs_per_blk;      // 2
+    static constexpr index_t group_size          = 4; // corresponding to CD rows mapping
+    static constexpr index_t num_groups_per_blk  = 4;
+    static constexpr index_t num_output_blks     = 1;
+    static constexpr index_t k_per_blk           = 2;
+    static constexpr bool is_k_reduction         = true;
+    // AB register size: 2, CD register size: 16
+    template <index_t MPerXdlops, index_t NPerXdlops, class FloatA, class FloatB, class FloatC>
+    __device__ void run(const FloatA& a, const FloatB& b, FloatC& reg_c) const
+    {
+        intrin_mfma_f32_32x32x4xf32<MPerXdlops, NPerXdlops>::Run(a, b, reg_c);
+    }
+};
+
 // gfx11
 struct mfma_type_gfx11_base
 {
@@ -1116,12 +1182,30 @@ struct mfma_type<MfmaInstr::wmma_unsupport_16x16_gfx12> : public mfma_type_gfx12
     }
 };
 
+/**
+ * @class MfmaSelector
+ * @brief Selects the appropriate MFMA instruction type and configuration for given data types
+ *          and tile sizes on AMD GPUs.
+ *
+ * @tparam base_type        The base data type for the matrix operation (e.g., float, half_t).
+ * @tparam MPerXdlops       The number of rows per XDLops tile.
+ * @tparam NPerXdlops       The number of columns per XDLops tile.
+ * @tparam additional_type  (Optional) Additional data type for mixed-precision or special cases.
+ *                          Defaults to base_type.
+ * @tparam is_single_rate_mfma (Optional) Whether to use single-rate MFMA instructions.
+ *                          Defaults to false.
+ * @tparam is_scale_mfma    (Optional) Whether to use scale MFMA instructions. Defaults to false.
+ * @tparam gemm_type        (Optional) Used to distinguish compute types
+ *                                  (e.g., fp32 vs xf32 for fp32 input).
+ *                          Defaults to base_type for consistency with other input types.
+ */
 template <typename base_type,
           index_t MPerXdlops,
           index_t NPerXdlops,
           typename additional_type = base_type,
           bool is_single_rate_mfma = false,
-          bool is_scale_mfma       = false>
+          bool is_scale_mfma       = false,
+          typename gemm_type       = base_type>
 struct MfmaSelector
 {
     template <typename base_type_,
@@ -1129,7 +1213,8 @@ struct MfmaSelector
               index_t NPerXdlops_,
               typename additional_type_ = base_type_,
               bool is_single_rate_mfma_ = false,
-              bool is_scale_mfma_       = false>
+              bool is_scale_mfma_       = false,
+              typename gemm_type_       = base_type_>
     static constexpr auto GetMfma();
 
     template <>
@@ -1147,37 +1232,37 @@ struct MfmaSelector
     template <>
     constexpr auto GetMfma<float, 64, 64>()
     {
-        return MfmaInstr::mfma_f32_32x32x1xf32;
+        return MfmaInstr::mfma_f32_32x32x1f32;
     }
 
     template <>
     constexpr auto GetMfma<float, 32, 64>()
     {
-        return MfmaInstr::mfma_f32_32x32x1xf32;
+        return MfmaInstr::mfma_f32_32x32x1f32;
     }
 
     template <>
     constexpr auto GetMfma<float, 16, 64>()
     {
-        return MfmaInstr::mfma_f32_16x16x1xf32;
+        return MfmaInstr::mfma_f32_16x16x1f32;
     }
 
     template <>
     constexpr auto GetMfma<float, 8, 64>()
     {
-        return MfmaInstr::mfma_f32_4x4x1xf32;
+        return MfmaInstr::mfma_f32_4x4x1f32;
     }
 
     template <>
     constexpr auto GetMfma<float, 4, 64>()
     {
-        return MfmaInstr::mfma_f32_4x4x1xf32;
+        return MfmaInstr::mfma_f32_4x4x1f32;
     }
 
     template <>
     constexpr auto GetMfma<float, 32, 32>()
     {
-        return MfmaInstr::mfma_f32_32x32x2xf32;
+        return MfmaInstr::mfma_f32_32x32x2f32;
     }
 
     template <>
@@ -1188,8 +1273,20 @@ struct MfmaSelector
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #else
-        return MfmaInstr::mfma_f32_16x16x4xf32;
+        return MfmaInstr::mfma_f32_16x16x4f32;
 #endif
+    }
+
+    template <>
+    constexpr auto GetMfma<float, 32, 32, float, false, false, xf32_t>()
+    {
+        return MfmaInstr::mfma_f32_32x32x4xf32;
+    }
+
+    template <>
+    constexpr auto GetMfma<float, 16, 16, float, false, false, xf32_t>()
+    {
+        return MfmaInstr::mfma_f32_16x16x8xf32;
     }
 
     template <>
@@ -1205,7 +1302,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<half_t, 32, 32, half_t, false>()
+    constexpr auto GetMfma<half_t, 32, 32, half_t, false, false, half_t>()
     {
 #if defined(__gfx950__)
         return MfmaInstr::mfma_f32_32x32x16f16;
@@ -1214,13 +1311,13 @@ struct MfmaSelector
 #endif
     }
     template <>
-    constexpr auto GetMfma<half_t, 32, 32, half_t, true>()
+    constexpr auto GetMfma<half_t, 32, 32, half_t, true, false, half_t>()
     {
         return MfmaInstr::mfma_f32_32x32x8f16;
     }
 
     template <>
-    constexpr auto GetMfma<half_t, 16, 16, half_t, false>()
+    constexpr auto GetMfma<half_t, 16, 16, half_t, false, false, half_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f16_gfx12;
@@ -1234,7 +1331,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<half_t, 16, 16, half_t, true>()
+    constexpr auto GetMfma<half_t, 16, 16, half_t, true, false, half_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f16_gfx12;
@@ -1264,7 +1361,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bhalf_t, 32, 32, bhalf_t, false>()
+    constexpr auto GetMfma<bhalf_t, 32, 32, bhalf_t, false, false, bhalf_t>()
     {
 #if defined(__gfx950__)
         return MfmaInstr::mfma_f32_32x32x16bf16;
@@ -1276,7 +1373,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bhalf_t, 32, 32, bhalf_t, true>()
+    constexpr auto GetMfma<bhalf_t, 32, 32, bhalf_t, true, false, bhalf_t>()
     {
 #if defined(CK_USE_AMD_MFMA_BF16_1K_OP)
         return MfmaInstr::mfma_f32_32x32x8bf16_1k;
@@ -1286,7 +1383,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bhalf_t, 16, 16, bhalf_t, false>()
+    constexpr auto GetMfma<bhalf_t, 16, 16, bhalf_t, false, false, bhalf_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf16_gfx12;
@@ -1302,7 +1399,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bhalf_t, 16, 16, bhalf_t, true>()
+    constexpr auto GetMfma<bhalf_t, 16, 16, bhalf_t, true, false, bhalf_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf16_gfx12;
@@ -1316,7 +1413,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<int8_t, 32, 32, int8_t, false>()
+    constexpr auto GetMfma<int8_t, 32, 32, int8_t, false, false, int8_t>()
     {
 #if defined(__gfx950__)
         return MfmaInstr::mfma_i32_32x32x32i8;
@@ -1328,7 +1425,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<int8_t, 32, 32, int8_t, true>()
+    constexpr auto GetMfma<int8_t, 32, 32, int8_t, true, false, int8_t>()
     {
 #if defined(__gfx942__) || defined(__gfx950__)
         return MfmaInstr::mfma_i32_32x32x16i8;
@@ -1338,7 +1435,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<int8_t, 16, 16, int8_t, false>()
+    constexpr auto GetMfma<int8_t, 16, 16, int8_t, false, false, int8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_i32_16x16x16_iu8_gfx12;
@@ -1354,7 +1451,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<int8_t, 16, 16, int8_t, true>()
+    constexpr auto GetMfma<int8_t, 16, 16, int8_t, true, false, int8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_i32_16x16x16_iu8_gfx12;
@@ -1368,13 +1465,13 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 32, 32, f8_t, true, false>()
+    constexpr auto GetMfma<f8_t, 32, 32, f8_t, true, false, f8_t>()
     {
         return MfmaInstr::mfma_f32_32x32x16f8f8;
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 32, 32, f8_t, false, false>()
+    constexpr auto GetMfma<f8_t, 32, 32, f8_t, false, false, f8_t>()
     {
 #if defined(__gfx950__)
         return MfmaInstr::mfma_f32_32x32x64f8f6f4;
@@ -1384,13 +1481,13 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 32, 32, f8_t, is_single_rate_mfma, true>()
+    constexpr auto GetMfma<f8_t, 32, 32, f8_t, is_single_rate_mfma, true, f8_t>()
     {
         return MfmaInstr::mfma_scale_f32_32x32x64f8f6f4;
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 32, 32, f8_t, is_single_rate_mfma, true>()
+    constexpr auto GetMfma<bf8_t, 32, 32, f8_t, is_single_rate_mfma, true, bf8_t>()
     {
         return MfmaInstr::mfma_scale_f32_32x32x64f8f6f4;
     }
@@ -1412,7 +1509,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 16, 16, f8_t, true, false>()
+    constexpr auto GetMfma<f8_t, 16, 16, f8_t, true, false, f8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f8f8_gfx12;
@@ -1424,7 +1521,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 16, 16, f8_t, false, false>()
+    constexpr auto GetMfma<f8_t, 16, 16, f8_t, false, false, f8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f8f8_gfx12;
@@ -1438,7 +1535,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 16, 16, f8_t, is_single_rate_mfma, true>()
+    constexpr auto GetMfma<f8_t, 16, 16, f8_t, is_single_rate_mfma, true, f8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
@@ -1450,7 +1547,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 16, 16, bf8_t, is_single_rate_mfma, true>()
+    constexpr auto GetMfma<bf8_t, 16, 16, bf8_t, is_single_rate_mfma, true, bf8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
@@ -1462,7 +1559,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 16, 16, bf8_t, is_single_rate_mfma, true>()
+    constexpr auto GetMfma<f8_t, 16, 16, bf8_t, is_single_rate_mfma, true, f8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
@@ -1474,7 +1571,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 16, 16, f8_t, is_single_rate_mfma, true>()
+    constexpr auto GetMfma<bf8_t, 16, 16, f8_t, is_single_rate_mfma, true, bf8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
@@ -1519,13 +1616,13 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 32, 32, bf8_t, true, false>()
+    constexpr auto GetMfma<bf8_t, 32, 32, bf8_t, true, false, bf8_t>()
     {
         return MfmaInstr::mfma_f32_32x32x16bf8bf8;
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 32, 32, bf8_t, false, false>()
+    constexpr auto GetMfma<bf8_t, 32, 32, bf8_t, false, false, bf8_t>()
     {
 #if defined(__gfx950__)
         return MfmaInstr::mfma_f32_32x32x64f8f6f4;
@@ -1535,7 +1632,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 16, 16, bf8_t, true, false>()
+    constexpr auto GetMfma<bf8_t, 16, 16, bf8_t, true, false, bf8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf8bf8_gfx12;
@@ -1547,7 +1644,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 16, 16, bf8_t, false, false>()
+    constexpr auto GetMfma<bf8_t, 16, 16, bf8_t, false, false, bf8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf8bf8_gfx12;
@@ -1561,13 +1658,13 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 32, 32, bf8_t, true, false>()
+    constexpr auto GetMfma<f8_t, 32, 32, bf8_t, true, false, f8_t>()
     {
         return MfmaInstr::mfma_f32_32x32x16f8bf8;
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 32, 32, bf8_t, false, false>()
+    constexpr auto GetMfma<f8_t, 32, 32, bf8_t, false, false, f8_t>()
     {
 #if defined(__gfx950__)
         return MfmaInstr::mfma_f32_32x32x64f8f6f4;
@@ -1577,7 +1674,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 16, 16, bf8_t, true, false>()
+    constexpr auto GetMfma<f8_t, 16, 16, bf8_t, true, false, f8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f8bf8_gfx12;
@@ -1589,7 +1686,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<f8_t, 16, 16, bf8_t, false, false>()
+    constexpr auto GetMfma<f8_t, 16, 16, bf8_t, false, false, f8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_f8bf8_gfx12;
@@ -1603,13 +1700,13 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 32, 32, f8_t, true, false>()
+    constexpr auto GetMfma<bf8_t, 32, 32, f8_t, true, false, bf8_t>()
     {
         return MfmaInstr::mfma_f32_32x32x16bf8f8;
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 32, 32, f8_t, false, false>()
+    constexpr auto GetMfma<bf8_t, 32, 32, f8_t, false, false, bf8_t>()
     {
 #if defined(__gfx950__)
         return MfmaInstr::mfma_f32_32x32x64f8f6f4;
@@ -1619,7 +1716,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 16, 16, f8_t, true, false>()
+    constexpr auto GetMfma<bf8_t, 16, 16, f8_t, true, false, bf8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf8f8_gfx12;
@@ -1631,7 +1728,7 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<bf8_t, 16, 16, f8_t, false, false>()
+    constexpr auto GetMfma<bf8_t, 16, 16, f8_t, false, false, bf8_t>()
     {
 #if defined(__gfx12__)
         return MfmaInstr::wmma_f32_16x16x16_bf8f8_gfx12;
@@ -1643,13 +1740,60 @@ struct MfmaSelector
         return MfmaInstr::mfma_f32_16x16x32bf8f8;
 #endif
     }
+
+    /* Use Macro to instance different gemm_types (vs default manu instance)            */
+    // clang-format off
+#define GET_MFMA_INSTANCE_FULL_PARAMS( \
+        datatype_base, m, n, datatype_additional, is_single_rate, is_scale, gemm_type)\
+    template <>                                                                                             \
+    constexpr auto GetMfma<datatype_base, m, n, datatype_additional, is_single_rate, is_scale, gemm_type>() \
+    {                                                                                                       \
+        return GetMfma<datatype_base, m, n, datatype_additional, is_single_rate, is_scale, datatype_base>();\
+    }                                                                                                       \
+
+    /* Based on current instance, instance multi m/n to simple code. */
+#define GET_MFMA_INSTANCE_MULTI_MN(datatype_base, datatype_additional, is_single_rate, is_scale, gemm_type)         \
+    GET_MFMA_INSTANCE_FULL_PARAMS(datatype_base, 32, 32, datatype_additional, is_single_rate, is_scale, gemm_type)  \
+    GET_MFMA_INSTANCE_FULL_PARAMS(datatype_base, 16, 16, datatype_additional, is_single_rate, is_scale, gemm_type)
+
+    /* Based on current instance, instance multi m/n and is_single_rate to simple code. */
+#define GET_MFMA_INSTANCE_MULTI_MN_RATE(datatype_base, datatype_additional, gemm_type)      \
+    GET_MFMA_INSTANCE_MULTI_MN(datatype_base, datatype_additional, false, false, gemm_type) \
+    GET_MFMA_INSTANCE_MULTI_MN(datatype_base, datatype_additional, true, false, gemm_type)
+    // clang-format on
+
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(int8_t, int8_t, int);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(bhalf_t, bhalf_t, float);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(half_t, half_t, float);
+
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(bf8_t, bf8_t, float);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(bf8_t, bf8_t, half_t);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(bf8_t, bf8_t, f8_t);
+
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(bf8_t, f8_t, float);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(bf8_t, f8_t, half_t);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(bf8_t, f8_t, f8_t);
+
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(f8_t, bf8_t, float);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(f8_t, bf8_t, half_t);
+
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(f8_t, f8_t, float);
+    GET_MFMA_INSTANCE_MULTI_MN_RATE(f8_t, f8_t, half_t);
+
+    GET_MFMA_INSTANCE_MULTI_MN(f8_t, f8_t, false, true, float);
+    GET_MFMA_INSTANCE_MULTI_MN(f8_t, f8_t, false, true, half_t);
+
+#undef GET_MFMA_INSTANCE_FULL_PARAMS
+#undef GET_MFMA_INSTANCE_MULTI_MN
+#undef GET_MFMA_INSTANCE_MULTI_MN_RATE
 
     static constexpr auto selected_mfma = mfma_type<GetMfma<element_type_t<base_type>,
                                                             MPerXdlops,
                                                             NPerXdlops,
                                                             element_type_t<additional_type>,
                                                             is_single_rate_mfma,
-                                                            is_scale_mfma>()>{};
+                                                            is_scale_mfma,
+                                                            element_type_t<gemm_type>>()>{};
 
     __host__ __device__ constexpr MfmaSelector()
     {
@@ -1706,7 +1850,8 @@ template <typename base_type,
           index_t KPack,
           typename additional_type = base_type,
           bool TransposeC          = false,
-          bool is_scale_mfma       = false>
+          bool is_scale_mfma       = false,
+          typename gemm_type       = base_type>
 struct XdlopsGemm
 {
     static constexpr auto I0 = Number<0>{};
@@ -1896,7 +2041,7 @@ struct XdlopsGemm
 
     __device__ __host__ static constexpr index_t GetRegSizePerXdlops()
     {
-        return MPerXdlops * NPerXdlops / mfma_instr.wave_size;
+        return mfma_instr.num_regs_per_blk;
     }
 
     __device__ static constexpr index_t GetWaveSize() { return mfma_instr.wave_size; }
@@ -1905,13 +2050,15 @@ struct XdlopsGemm
     __device__ void Run(const FloatA& p_a_wave, const FloatB& p_b_wave, FloatC& p_c_thread) const
     {
         static_assert(
-            is_same<base_type, double>::value || is_same<base_type, float>::value ||
+            is_same<base_type, double>::value ||
+                (is_same<base_type, float>::value &&
+                 (is_same<gemm_type, float>::value || is_same<gemm_type, xf32_t>::value)) ||
                 is_same<base_type, half_t>::value || is_same<base_type, bhalf_t>::value ||
                 is_same<base_type, int8_t>::value || is_same<base_type, f8_t>::value ||
                 is_same<base_type, bf8_t>::value ||
                 (is_same<base_type, f8_t>::value && is_same<additional_type, bf8_t>::value) ||
                 (is_same<base_type, bf8_t>::value && is_same<additional_type, f8_t>::value),
-            "base base_type must be double, float, half, bfloat16, int8_t, f8_t or bf8_t!");
+            "base_type must be double, float, half, bfloat16, int8_t, f8_t or bf8_t!");
 
         static_for<0, KPack / mfma_instr.k_per_blk, 1>{}([&](auto k) {
             if constexpr(!TransposeC)
@@ -2082,7 +2229,8 @@ struct XdlopsGemm
                                               NPerXdlops,
                                               additional_type,
                                               is_single_rate_mfma,
-                                              is_scale_mfma>{};
+                                              is_scale_mfma,
+                                              gemm_type>{};
 
     static constexpr auto mfma_instr = mfma.selected_mfma;
 
