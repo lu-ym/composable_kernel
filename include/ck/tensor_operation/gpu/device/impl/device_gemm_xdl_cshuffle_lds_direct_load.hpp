@@ -78,7 +78,7 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
         ELayout,
         ADataType,
         BDataType,
-        ADataType,
+        ComputeDataType,
         AccDataType,
         CShuffleDataType,
         ck::Tuple<>,
@@ -115,7 +115,6 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
         CDEBlockTransferScalarPerVector_NPerBlock,
         LoopSched,
         PipelineVer,
-        BDataType,
         ComputeDataType>;
 
     using Argument = typename GridwiseGemm::Argument;

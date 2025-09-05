@@ -140,8 +140,7 @@ template <typename ALayout,
           index_t CDEShuffleBlockTransferScalarPerVector_NPerBlock,
           LoopScheduler LoopSched,
           PipelineVersion PipelineVer = PipelineVersion::v4,
-          typename BComputeDataType   = AComputeDataType_,
-          typename GemmDataType       = EDataType>
+          typename BComputeDataType_  = AComputeDataType_>
 struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
 {
     static constexpr index_t NumDTensor = DsDataType::Size();
@@ -169,7 +168,12 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
     using AComputeDataType =
         conditional_t<is_same_v<AComputeDataType_, ck::half_t>, ck::bhalf_t, AComputeDataType_>;
 #else
-    using AComputeDataType = AComputeDataType_;
+    using AComputeDataType =
+        conditional_t<is_same_v<AComputeDataType_, ck::xf32_t>, float, AComputeDataType_>;
+    using BComputeDataType =
+        conditional_t<is_same_v<BComputeDataType_, ck::xf32_t>, float, BComputeDataType_>;
+    using GemmDataTypeA = AComputeDataType_;
+    using GemmDataTypeB = BComputeDataType_;
 #endif
 
     __host__ __device__ static constexpr auto GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1()
@@ -633,13 +637,12 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
         constexpr auto is_scale_mfma = false;
 
         constexpr index_t KPack = math::max(lcm_AK1_BK1,
-                                            MfmaSelector<AComputeDataType,
+                                            MfmaSelector<GemmDataTypeA,
                                                          MPerXdl,
                                                          NPerXdl,
-                                                         BComputeDataType,
+                                                         GemmDataTypeB,
                                                          is_single_rate_mfma,
-                                                         is_scale_mfma,
-                                                         GemmDataType>::selected_mfma.k_per_blk);
+                                                         is_scale_mfma>::selected_mfma.k_per_blk);
 
         auto blockwise_gemm = BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_Selector<
             BlockSize,
@@ -654,9 +657,8 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
             NXdlPerWave,
             KPack,
             LoopSched,
-            AComputeDataType_,
-            BComputeDataType,
-            GemmDataType>();
+            GemmDataTypeA,
+            GemmDataTypeB>();
 
         auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 
