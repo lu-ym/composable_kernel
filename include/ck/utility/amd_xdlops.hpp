@@ -1636,7 +1636,7 @@ struct intrin_mfma_f32_16x16x32bf8f8<16, 16>
     }
 };
 
-/******************* xf32  *************************************/
+/******************* tf32  *************************************/
 template <index_t MPerWave, index_t NPerWave>
 struct intrin_mfma_f32_16x16x8xf32;
 

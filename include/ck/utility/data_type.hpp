@@ -26,7 +26,7 @@ using byte = unsigned char;
 using std::byte;
 #endif
 
-using xf32_t  = _BitInt(19); // 1 sign bit, 8 exponent bits, 10 mantissa bits
+using tf32_t  = _BitInt(19); // 1 sign bit, 8 exponent bits, 10 mantissa bits
 using bhalf_t = ushort;
 using half_t  = _Float16;
 using int4_t  = _BitInt(4);
@@ -469,7 +469,7 @@ inline std::string get_type_name()
         return "fp16";
     else if constexpr(std::is_same_v<T, bhalf_t>)
         return "bf16";
-    else if constexpr(std::is_same_v<T, xf32_t>)
+    else if constexpr(std::is_same_v<T, tf32_t>)
         return "tf32";
     else if constexpr(std::is_same_v<T, int4_t>)
         return "int4";

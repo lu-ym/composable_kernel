@@ -328,7 +328,7 @@ struct ReferenceConvFwd : public device::BaseOperator
                                                              z,
                                                              y,
                                                              x);
-                                        if constexpr(std::is_same_v<GemmDataType, ck::xf32_t>)
+                                        if constexpr(std::is_same_v<GemmDataType, ck::tf32_t>)
                                         {
                                             auto truncate_float_to_xfloat32 = [](float f) {
                                                 union

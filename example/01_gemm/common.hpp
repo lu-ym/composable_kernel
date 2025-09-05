@@ -313,7 +313,7 @@ bool parse_cmd_args<ProblemSizeSplitK>(int argc,
 template <typename DataType, typename GemmType = DataType>
 inline __host__ __device__ constexpr double get_rtol()
 {
-    if constexpr(std::is_same_v<DataType, float> && std::is_same_v<GemmType, ck::xf32_t>)
+    if constexpr(std::is_same_v<DataType, float> && std::is_same_v<GemmType, ck::tf32_t>)
     {
         return 1e-3;
     }
@@ -358,7 +358,7 @@ inline __host__ __device__ constexpr double get_rtol()
 template <typename DataType, typename GemmType = DataType>
 inline __host__ __device__ constexpr double get_atol()
 {
-    if constexpr(std::is_same_v<DataType, float> && std::is_same_v<GemmType, ck::xf32_t>)
+    if constexpr(std::is_same_v<DataType, float> && std::is_same_v<GemmType, ck::tf32_t>)
     {
         return 1e-3;
     }

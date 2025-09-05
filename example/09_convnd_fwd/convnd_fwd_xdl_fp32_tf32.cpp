@@ -14,7 +14,7 @@ using WeiDataType      = float;
 using AccDataType      = float;
 using CShuffleDataType = float;
 using OutDataType      = float;
-using GemmDataType     = ck::xf32_t;
+using GemmDataType     = ck::tf32_t;
 
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;

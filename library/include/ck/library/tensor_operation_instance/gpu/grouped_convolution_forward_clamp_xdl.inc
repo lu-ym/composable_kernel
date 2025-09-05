@@ -578,7 +578,7 @@ void add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_instances(
                                                                 PassThrough,
                                                                 Clamp>>>& instances);
 
-void add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances(
+void add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances(
     std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
                                                                 NDHWGC,
                                                                 GKZYXC,
@@ -591,8 +591,8 @@ void add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_insta
                                                                 PassThrough,
                                                                 PassThrough,
                                                                 Clamp,
-                                                                XF32,
-                                                                XF32>>>& instances);
+                                                                TF32,
+                                                                TF32>>>& instances);
 
 void add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_16x16_instances(
     std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,

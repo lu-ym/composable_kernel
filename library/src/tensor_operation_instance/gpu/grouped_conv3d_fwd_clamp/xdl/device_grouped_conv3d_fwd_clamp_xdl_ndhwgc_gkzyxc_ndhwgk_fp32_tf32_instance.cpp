@@ -9,49 +9,49 @@ namespace tensor_operation {
 namespace device {
 namespace instance {
 
-void add_device_grouped_conv3d_fwd_bias_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances(
+void add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances(
     std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
                                                                 NDHWGC,
                                                                 GKZYXC,
-                                                                Tuple<NDHWGK>,
+                                                                Tuple<>,
                                                                 NDHWGK,
                                                                 F32,
                                                                 F32,
-                                                                Tuple<F32>,
+                                                                Tuple<>,
                                                                 F32,
                                                                 PassThrough,
                                                                 PassThrough,
-                                                                AddClamp,
-                                                                XF32,
-                                                                XF32>>>& instances)
+                                                                Clamp,
+                                                                TF32,
+                                                                TF32>>>& instances)
 {
     add_device_operation_instances(instances,
-                                   device_grouped_conv_fwd_xdl_f32_xf32_instances<3,
+                                   device_grouped_conv_fwd_xdl_f32_tf32_instances<3,
                                                                                   NDHWGC,
                                                                                   GKZYXC,
-                                                                                  Tuple<NDHWGK>,
+                                                                                  Tuple<>,
                                                                                   NDHWGK,
                                                                                   ConvFwdDefault,
-                                                                                  Tuple<F32>,
-                                                                                  AddClamp>{});
+                                                                                  Tuple<>,
+                                                                                  Clamp>{});
     add_device_operation_instances(instances,
-                                   device_grouped_conv_fwd_xdl_f32_xf32_instances<3,
+                                   device_grouped_conv_fwd_xdl_f32_tf32_instances<3,
                                                                                   NDHWGC,
                                                                                   GKZYXC,
-                                                                                  Tuple<NDHWGK>,
+                                                                                  Tuple<>,
                                                                                   NDHWGK,
                                                                                   ConvFwd1x1P0,
-                                                                                  Tuple<F32>,
-                                                                                  AddClamp>{});
+                                                                                  Tuple<>,
+                                                                                  Clamp>{});
     add_device_operation_instances(instances,
-                                   device_grouped_conv_fwd_xdl_f32_xf32_instances<3,
+                                   device_grouped_conv_fwd_xdl_f32_tf32_instances<3,
                                                                                   NDHWGC,
                                                                                   GKZYXC,
-                                                                                  Tuple<NDHWGK>,
+                                                                                  Tuple<>,
                                                                                   NDHWGK,
                                                                                   ConvFwd1x1S1P0,
-                                                                                  Tuple<F32>,
-                                                                                  AddClamp>{});
+                                                                                  Tuple<>,
+                                                                                  Clamp>{});
 }
 
 } // namespace instance

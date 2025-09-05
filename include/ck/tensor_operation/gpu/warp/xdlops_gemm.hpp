@@ -78,7 +78,7 @@ enum struct MfmaInstr
     mfma_f32_16x16x128f8f6f4,
     mfma_scale_f32_32x32x64f8f6f4,
     mfma_scale_f32_16x16x128f8f6f4,
-    mfma_f32_16x16x8xf32, // xf32
+    mfma_f32_16x16x8xf32, // tf32
     mfma_f32_32x32x4xf32,
     // gfx11
     wmma_f32_16x16x16_f16,
@@ -1273,13 +1273,13 @@ struct MfmaSelector
     }
 
     template <>
-    constexpr auto GetMfma<xf32_t, 32, 32>()
+    constexpr auto GetMfma<tf32_t, 32, 32>()
     {
         return MfmaInstr::mfma_f32_32x32x4xf32;
     }
 
     template <>
-    constexpr auto GetMfma<xf32_t, 16, 16>()
+    constexpr auto GetMfma<tf32_t, 16, 16>()
     {
         return MfmaInstr::mfma_f32_16x16x8xf32;
     }
@@ -1998,12 +1998,12 @@ struct XdlopsGemm
     {
         static_assert(
             is_same<base_type, double>::value || is_same<base_type, float>::value ||
-                is_same<base_type, xf32_t>::value || is_same<base_type, half_t>::value ||
+                is_same<base_type, tf32_t>::value || is_same<base_type, half_t>::value ||
                 is_same<base_type, bhalf_t>::value || is_same<base_type, int8_t>::value ||
                 is_same<base_type, f8_t>::value || is_same<base_type, bf8_t>::value ||
                 (is_same<base_type, f8_t>::value && is_same<additional_type, bf8_t>::value) ||
                 (is_same<base_type, bf8_t>::value && is_same<additional_type, f8_t>::value),
-            "base_type must be double, float, xf32_t, half, bfloat16, int8_t, f8_t or bf8_t!");
+            "base_type must be double, float, tf32_t, half, bfloat16, int8_t, f8_t or bf8_t!");
 
         static_for<0, KPack / mfma_instr.k_per_blk, 1>{}([&](auto k) {
             if constexpr(!TransposeC)

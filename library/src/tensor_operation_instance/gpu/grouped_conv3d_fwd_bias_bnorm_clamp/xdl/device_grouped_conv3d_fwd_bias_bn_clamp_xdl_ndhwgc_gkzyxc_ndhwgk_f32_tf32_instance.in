@@ -10,7 +10,7 @@ namespace tensor_operation {
 namespace device {
 namespace instance {
 
-using device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances =
+using device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances =
     std::vector<std::unique_ptr<
         DeviceGroupedConvFwdMultipleABD<3,
                                         NDHWGC,
@@ -24,17 +24,17 @@ using device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_
                                         PassThrough,
                                         PassThrough,
                                         BiasNormalizeInInferClamp,
-                                        XF32,
-                                        XF32>>>;
+                                        TF32,
+                                        TF32>>>;
 
 // Compilation parameters for in[n, hi, wi, g, c] * wei[g, k, y, x, c] = out[n, ho, wo, g, k]
 template <int Shards, int ShardIndex>
-void add_device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances_shard(
-    device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances& instances)
+void add_device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances_shard(
+    device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances& instances)
 {
     add_device_operation_instances(
         instances,
-        ck::util::filter_tuple_by_modulo_t<device_grouped_conv_fwd_xdl_f32_xf32_instances<
+        ck::util::filter_tuple_by_modulo_t<device_grouped_conv_fwd_xdl_f32_tf32_instances<
                                                3,
                                                NDHWGC,
                                                GKZYXC,
@@ -48,7 +48,7 @@ void add_device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf
 
     add_device_operation_instances(
         instances,
-        ck::util::filter_tuple_by_modulo_t<device_grouped_conv_fwd_xdl_f32_xf32_instances<
+        ck::util::filter_tuple_by_modulo_t<device_grouped_conv_fwd_xdl_f32_tf32_instances<
                                                3,
                                                NDHWGC,
                                                GKZYXC,
@@ -62,7 +62,7 @@ void add_device_grouped_conv3d_fwd_bias_bn_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_xf
 
     add_device_operation_instances(
         instances,
-        ck::util::filter_tuple_by_modulo_t<device_grouped_conv_fwd_xdl_f32_xf32_instances<
+        ck::util::filter_tuple_by_modulo_t<device_grouped_conv_fwd_xdl_f32_tf32_instances<
                                                3,
                                                NDHWGC,
                                                GKZYXC,

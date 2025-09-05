@@ -21,7 +21,7 @@ using BDataType        = F32;
 using AccDataType      = F32;
 using CShuffleDataType = F32;
 using CDataType        = F32;
-using GemmDataType     = ck::xf32_t;
+using GemmDataType     = ck::tf32_t;
 
 using ALayout = Row;
 using BLayout = Col;

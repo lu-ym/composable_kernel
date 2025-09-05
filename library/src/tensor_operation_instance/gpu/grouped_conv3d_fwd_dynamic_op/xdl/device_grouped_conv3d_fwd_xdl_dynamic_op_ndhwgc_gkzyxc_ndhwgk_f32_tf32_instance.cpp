@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2024, Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #include "ck/library/tensor_operation_instance/gpu/grouped_conv_fwd/device_grouped_conv_fwd_xdl_dynamic_op_instance.hpp"
 #include "ck/library/tensor_operation_instance/add_device_operation_instance.hpp"
@@ -9,7 +9,7 @@ namespace tensor_operation {
 namespace device {
 namespace instance {
 
-void add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances(
+void add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances(
     std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
                                                                 NDHWGC,
                                                                 GKZYXC,
@@ -22,12 +22,12 @@ void add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_xf32_
                                                                 PassThrough,
                                                                 PassThrough,
                                                                 DynamicUnaryOp,
-                                                                XF32,
-                                                                XF32>>>& instances)
+                                                                TF32,
+                                                                TF32>>>& instances)
 {
     add_device_operation_instances(
         instances,
-        device_grouped_conv_fwd_xdl_dynamic_op_f32_xf32_instances<3,
+        device_grouped_conv_fwd_xdl_dynamic_op_f32_tf32_instances<3,
                                                                   NDHWGC,
                                                                   GKZYXC,
                                                                   Tuple<>,

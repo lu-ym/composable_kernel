@@ -1043,8 +1043,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         float RunGemm(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
-            ::std::cout << __FILE__ << ":" << __LINE__
-                        << " DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle" << std::endl;
             if(stream_config.log_level_ > 0)
             {
                 arg.Print();
@@ -1657,6 +1655,23 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                                                              arg.block_2_etile_map_);
             }
         }
+        if constexpr(is_same_v<AComputeDataType, ck::tf32_t> ||
+                     is_same_v<BComputeDataType, ck::tf32_t>)
+
+        {
+            if(!(ck::get_device_name() == "gfx942"))
+            {
+                std::cout << "TF32 is enabled on gfx942 only" << std::endl;
+                return false;
+            }
+            if constexpr(!is_same_v<AComputeDataType, BComputeDataType>)
+            {
+                std::cout << "ComputeDataType for A and B should be same while using TF32"
+                          << std::endl;
+                return false;
+            }
+        }
+        return true;
     }
 
     bool IsSupportedArgument(const BaseArgument* p_arg) override

@@ -137,7 +137,7 @@ struct ReferenceGemm : public device::BaseOperator
                         arg.b_element_op_(v_b, arg.b_k_n_(k, n));
                     }
 
-                    if constexpr(ck::is_same_v<ComputeTypeGemm, ck::xf32_t>)
+                    if constexpr(ck::is_same_v<ComputeTypeGemm, ck::tf32_t>)
                     {
                         auto truncate_float_to_xfloat32 = [](float f) {
                             union

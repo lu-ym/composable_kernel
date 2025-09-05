@@ -169,9 +169,9 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
         conditional_t<is_same_v<AComputeDataType_, ck::half_t>, ck::bhalf_t, AComputeDataType_>;
 #else
     using AComputeDataType =
-        conditional_t<is_same_v<AComputeDataType_, ck::xf32_t>, float, AComputeDataType_>;
+        conditional_t<is_same_v<AComputeDataType_, ck::tf32_t>, float, AComputeDataType_>;
     using BComputeDataType =
-        conditional_t<is_same_v<BComputeDataType_, ck::xf32_t>, float, BComputeDataType_>;
+        conditional_t<is_same_v<BComputeDataType_, ck::tf32_t>, float, BComputeDataType_>;
     using GemmDataTypeA = AComputeDataType_;
     using GemmDataTypeB = BComputeDataType_;
 #endif

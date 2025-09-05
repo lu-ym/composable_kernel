@@ -49,8 +49,8 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
-    using ComputeTypeA  = conditional_t<is_same_v<ComputeTypeA_, ck::xf32_t>, float, ComputeTypeA_>;
-    using ComputeTypeB  = conditional_t<is_same_v<ComputeTypeB_, ck::xf32_t>, float, ComputeTypeB_>;
+    using ComputeTypeA  = conditional_t<is_same_v<ComputeTypeA_, ck::tf32_t>, float, ComputeTypeA_>;
+    using ComputeTypeB  = conditional_t<is_same_v<ComputeTypeB_, ck::tf32_t>, float, ComputeTypeB_>;
     using GemmDataTypeA = ComputeTypeA_;
     using GemmDataTypeB = ComputeTypeB_;
 
@@ -177,11 +177,10 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
 
         static_assert(MPerBlock % (MPerXDL * MRepeat) == 0 && NPerBlock % (NPerXDL * NRepeat) == 0,
                       "wrong!");
-        if constexpr(is_same_v<ComputeTypeA, ck::xf32_t> || is_same_v<ComputeTypeB, ck::xf32_t>)
+        if constexpr(is_same_v<ComputeTypeA, ck::tf32_t> || is_same_v<ComputeTypeB, ck::tf32_t>)
         {
-            static_assert(
-                is_same_v<ComputeTypeA_, ComputeTypeA_>,
-                "ComputeTypeA and ComputeTypeB must be both xf32_t when one of them is xf32_t");
+            static_assert(is_same_v<ComputeTypeA_, ComputeTypeA_>,
+                          "ComputeTypeA and ComputeTypeB must be same when one of them is tf32");
         }
     }
 

@@ -133,7 +133,7 @@ void add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_insta
                                                                 PassThrough,
                                                                 DynamicUnaryOp>>>& instances);
 
-void add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances(
+void add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances(
     std::vector<std::unique_ptr<DeviceGroupedConvFwdMultipleABD<3,
                                                                 NDHWGC,
                                                                 GKZYXC,
@@ -146,8 +146,8 @@ void add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_xf32_
                                                                 PassThrough,
                                                                 PassThrough,
                                                                 DynamicUnaryOp,
-                                                                XF32,
-                                                                XF32>>>& instances);
+                                                                TF32,
+                                                                TF32>>>& instances);
 
 #endif
 
@@ -224,10 +224,10 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_instances(
                     op_ptrs);
             }
-            if constexpr(is_same_v<InDataType, float> && is_same_v<WeiDataType, ck::xf32_t> &&
-                         is_same_v<OutDataType, ck::xf32_t>)
+            if constexpr(is_same_v<InDataType, float> && is_same_v<WeiDataType, ck::tf32_t> &&
+                         is_same_v<OutDataType, ck::tf32_t>)
             {
-                add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_xf32_instances(
+                add_device_grouped_conv3d_fwd_xdl_dynamic_op_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instances(
                     op_ptrs);
             }
 #endif
