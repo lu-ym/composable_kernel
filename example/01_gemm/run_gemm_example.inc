@@ -5,8 +5,8 @@
 #include "ck/library/utility/validation_common.hpp"
 
 // use macro to minimize code change
-#ifndef EXAMPLE_WITH_GEMM_DATATYPE
-using GemmDataType = AccDataType;
+#ifndef EXAMPLE_WITH_COMPUTE_DATATYPE
+using ComputeDataType = AccDataType;
 #endif
 
 template <typename ProblemType>
@@ -223,8 +223,8 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         pass &= ck::utils::check_err(c_m_n_device_result,
                                      c_m_n_host_result,
                                      "Error: Incorrect results!",
-                                     get_rtol<CDataType, GemmDataType>(),
-                                     get_atol<CDataType, GemmDataType>());
+                                     get_rtol<CDataType, ComputeDataType>(),
+                                     get_atol<CDataType, ComputeDataType>());
 #endif
     }
 
@@ -254,8 +254,8 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         pass &= ck::utils::check_err(c_m_n_device_result,
                                      c_m_n_device_ref_result,
                                      "Error: Incorrect results!",
-                                     get_rtol<CDataType, GemmDataType>(),
-                                     get_atol<CDataType, GemmDataType>());
+                                     get_rtol<CDataType, ComputeDataType>(),
+                                     get_atol<CDataType, ComputeDataType>());
     }
 
     return pass == true;

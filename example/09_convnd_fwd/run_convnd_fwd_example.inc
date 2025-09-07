@@ -4,8 +4,8 @@
 #pragma once
 
 // use macro to minimize code change
-#ifndef EXAMPLE_WITH_GEMM_DATATYPE
-using GemmDataType = AccDataType;
+#ifndef EXAMPLE_WITH_COMPUTE_DATATYPE
+using ComputeDataType = AccDataType;
 #endif
 
 bool run_convnd_fwd_example(int argc, char* argv[])
@@ -71,16 +71,16 @@ bool run_convnd_fwd_example(int argc, char* argv[])
             WeiElementOp,
             OutElementOp,
             DeviceGroupedConvNDFwdInstance<ndim_spatial_value, InLayout, WeiLayout, OutLayout>,
-            GemmDataType>(do_verification,
-                          init_method,
-                          time_kernel,
-                          conv_param,
-                          in_g_n_c_wis_desc,
-                          wei_g_k_c_xs_desc,
-                          out_g_n_k_wos_desc,
-                          in_element_op,
-                          wei_element_op,
-                          out_element_op);
+            ComputeDataType>(do_verification,
+                             init_method,
+                             time_kernel,
+                             conv_param,
+                             in_g_n_c_wis_desc,
+                             wei_g_k_c_xs_desc,
+                             out_g_n_k_wos_desc,
+                             in_element_op,
+                             wei_element_op,
+                             out_element_op);
     };
 
     namespace ctc = ck::tensor_layout::convolution;

@@ -101,5 +101,7 @@ inline bool is_gfx103_supported()
            ck::get_device_name() == "gfx1035" || ck::get_device_name() == "gfx1036";
 }
 
+inline bool is_tf32_supported() { return (ck::get_device_name() == "gfx942") ? true : false; }
+
 } // namespace ck
 #endif

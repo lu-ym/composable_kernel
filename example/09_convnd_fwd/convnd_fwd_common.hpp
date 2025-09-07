@@ -125,7 +125,7 @@ template <ck::index_t NDimSpatial,
           typename WeiElementOp,
           typename OutElementOp,
           typename DeviceConvNDFwdInstance,
-          typename GemmDataType = OutDataType>
+          typename ComputeDataType = OutDataType>
 bool run_grouped_conv_fwd(bool do_verification,
                           int init_method,
                           bool time_kernel,
@@ -241,7 +241,7 @@ bool run_grouped_conv_fwd(bool do_verification,
                                                                      0,
                                                                      0,
                                                                      0,
-                                                                     GemmDataType>();
+                                                                     ComputeDataType>();
 
         auto ref_invoker  = ref_conv.MakeInvoker();
         auto ref_argument = ref_conv.MakeArgument(in,
@@ -262,8 +262,8 @@ bool run_grouped_conv_fwd(bool do_verification,
         return ck::utils::check_err(out_device,
                                     out_host,
                                     "Error: incorrect results!",
-                                    get_rtol<OutDataType, GemmDataType>(),
-                                    get_atol<OutDataType, GemmDataType>());
+                                    get_rtol<OutDataType, ComputeDataType>(),
+                                    get_atol<OutDataType, ComputeDataType>());
     }
 
     return true;

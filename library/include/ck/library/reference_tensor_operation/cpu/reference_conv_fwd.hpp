@@ -59,7 +59,7 @@ template <ck::index_t NDimSpatial,
           ck::index_t NumAElementwiseTensor                                         = 0,
           ck::index_t NumBElementwiseTensor                                         = 0,
           ck::index_t NumDElementwiseTensor                                         = 0,
-          typename GemmDataType                                                     = OutDataType,
+          typename ComputeDataType                                                  = InDataType,
           typename std::enable_if<NDimSpatial >= 1 && NDimSpatial <= 3, bool>::type = false>
 struct ReferenceConvFwd : public device::BaseOperator
 {
@@ -328,26 +328,10 @@ struct ReferenceConvFwd : public device::BaseOperator
                                                              z,
                                                              y,
                                                              x);
-                                        if constexpr(std::is_same_v<GemmDataType, ck::tf32_t>)
-                                        {
-                                            auto truncate_float_to_xfloat32 = [](float f) {
-                                                union
-                                                {
-                                                    float fp32;
-                                                    uint32_t int32;
-                                                } u = {f};
-
-                                                u.int32 = u.int32 & 0xffffe000;
-                                                return u.fp32;
-                                            };
-                                            v_acc += truncate_float_to_xfloat32(v_in) *
-                                                     truncate_float_to_xfloat32(v_wei);
-                                        }
-                                        else
-                                        {
-                                            v_acc += ck::type_convert<float>(v_in) *
-                                                     ck::type_convert<float>(v_wei);
-                                        }
+                                        v_acc += ck::type_convert<float>(
+                                                     ck::type_convert<ComputeDataType>(v_in)) *
+                                                 ck::type_convert<float>(
+                                                     ck::type_convert<ComputeDataType>(v_wei));
                                     }
                                 }
                             }

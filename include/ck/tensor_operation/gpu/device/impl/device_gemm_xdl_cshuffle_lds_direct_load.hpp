@@ -205,6 +205,14 @@ struct DeviceGemm_Xdl_CShuffle_LdsDirectLoad : public DeviceGemm<ALayout,
             return false;
         }
 
+        if constexpr(is_same_v<ComputeDataType, ck::tf32_t>)
+        {
+            if(!is_tf32_supported())
+            {
+                return false;
+            }
+        }
+
         // Check vector load/store.
         {
             using Row = ck::tensor_layout::gemm::RowMajor;

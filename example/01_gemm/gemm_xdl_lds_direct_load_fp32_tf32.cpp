@@ -12,7 +12,7 @@
 #include "ck/tensor_operation/gpu/device/impl/device_gemm_xdl_cshuffle.hpp"
 #endif
 
-#define EXAMPLE_WITH_GEMM_DATATYPE
+#define EXAMPLE_WITH_COMPUTE_DATATYPE
 
 using F32 = float;
 
@@ -21,7 +21,7 @@ using BDataType        = F32;
 using AccDataType      = F32;
 using CShuffleDataType = F32;
 using CDataType        = F32;
-using GemmDataType     = ck::tf32_t;
+using ComputeDataType  = ck::tf32_t;
 
 using ALayout = Row;
 using BLayout = Col;
@@ -45,7 +45,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemm_Xdl_CShuffle
 // ######|        |        |        |          |          |          |            |                 |            |            |            |               |         |      |      |      |      |    |    |     |     |     |     |                |               |               |               |          |                |               |              |               |          |            |            |                             |                |
          < ALayout, BLayout, CLayout, ADataType, BDataType, CDataType, AccDataType, CShuffleDataType,  AElementOp,  BElementOp,  CElementOp,    GemmDefault,        1,   256,   128,   128,    32,
            8,   8,   32,   32,    2,    2,      S<4, 8, 8>,     S<1, 0, 2>,              2,              1,         1,      S<4, 8, 8>,     S<1, 0, 2>,             2,              1,         1,
-           1,           1,               S<1, 8, 1, 8>,               4,   ck::LoopScheduler::Default, ck::PipelineVersion::v4, GemmDataType>;
+           1,           1,               S<1, 8, 1, 8>,               4,   ck::LoopScheduler::Default, ck::PipelineVersion::v4, ComputeDataType>;
 // clang-format on
 #else
 // clang-format off
@@ -66,7 +66,7 @@ using ReferenceGemmInstance = ck::tensor_operation::host::ReferenceGemm<ADataTyp
                                                                         CElementOp,
                                                                         ADataType,
                                                                         BDataType,
-                                                                        GemmDataType>;
+                                                                        ComputeDataType>;
 
 using ReferenceGemmInstanceGPU = ck::tensor_operation::device::ReferenceGemm<ALayout,
                                                                              BLayout,
@@ -80,10 +80,10 @@ using ReferenceGemmInstanceGPU = ck::tensor_operation::device::ReferenceGemm<ALa
                                                                              CElementOp,
                                                                              ADataType,
                                                                              BDataType,
-                                                                             GemmDataType>;
+                                                                             ComputeDataType>;
 
 #include "run_gemm_example.inc"
 
 int main(int argc, char* argv[]) { return !run_gemm_example(argc, argv); }
 
-#undef EXAMPLE_WITH_GEMM_DATATYPE
+#undef EXAMPLE_WITH_COMPUTE_DATATYPE

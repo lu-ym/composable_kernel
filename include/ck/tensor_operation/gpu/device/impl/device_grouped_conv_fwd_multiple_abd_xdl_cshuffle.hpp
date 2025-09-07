@@ -1621,7 +1621,20 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             return false;
         }
-
+        if constexpr(is_same_v<AComputeDataType, ck::tf32_t> ||
+                     is_same_v<BComputeDataType, ck::tf32_t>)
+        {
+            if(!is_tf32_supported())
+            {
+                return false;
+            }
+            if constexpr(!is_same_v<AComputeDataType, BComputeDataType>)
+            {
+                std::cout << "ComputeDataType for A and B should be same while using TF32"
+                          << std::endl;
+                return false;
+            }
+        }
         // check Gridwise GEMM
         if constexpr(isMultiA || isMultiB)
         {
@@ -1653,22 +1666,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                                                              arg.ds_grid_desc_m_n_,
                                                              arg.e_grid_desc_m_n_,
                                                              arg.block_2_etile_map_);
-            }
-        }
-        if constexpr(is_same_v<AComputeDataType, ck::tf32_t> ||
-                     is_same_v<BComputeDataType, ck::tf32_t>)
-
-        {
-            if(!(ck::get_device_name() == "gfx942"))
-            {
-                std::cout << "TF32 is enabled on gfx942 only" << std::endl;
-                return false;
-            }
-            if constexpr(!is_same_v<AComputeDataType, BComputeDataType>)
-            {
-                std::cout << "ComputeDataType for A and B should be same while using TF32"
-                          << std::endl;
-                return false;
             }
         }
         return true;

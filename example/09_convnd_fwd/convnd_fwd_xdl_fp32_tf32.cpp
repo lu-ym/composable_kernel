@@ -7,14 +7,14 @@
 
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 
-#define EXAMPLE_WITH_GEMM_DATATYPE
+#define EXAMPLE_WITH_COMPUTE_DATATYPE
 
 using InDataType       = float;
 using WeiDataType      = float;
 using AccDataType      = float;
 using CShuffleDataType = float;
 using OutDataType      = float;
-using GemmDataType     = ck::tf32_t;
+using ComputeDataType  = ck::tf32_t;
 
 template <ck::index_t... Is>
 using S = ck::Sequence<Is...>;
@@ -76,8 +76,8 @@ using DeviceGroupedConvNDFwdInstance =
         1,                // CShuffleNXdlPerWavePerShuffle
         S<1, 16, 1, 16>,  // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
         4,                // CDEBlockTransferScalarPerVector_NPerBlock
-        GemmDataType,     // AComputeDataType
-        GemmDataType,     // BComputeDataType
+        ComputeDataType,  // AComputeDataType
+        ComputeDataType,  // BComputeDataType
         ck::LoopScheduler::Default, // LoopScheduler
         1                           // NumGroupsToMerge
         >;
@@ -86,4 +86,4 @@ using DeviceGroupedConvNDFwdInstance =
 
 int main(int argc, char* argv[]) { return run_convnd_fwd_example(argc, argv) ? 0 : 1; }
 
-#undef EXAMPLE_WITH_GEMM_DATATYPE
+#undef EXAMPLE_WITH_COMPUTE_DATATYPE
