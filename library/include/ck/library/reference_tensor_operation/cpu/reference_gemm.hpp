@@ -150,32 +150,9 @@ struct ReferenceGemm : public device::BaseOperator
                                  is_same_v<ComputeTypeA, ck::tf32_t> &&
                                  is_same_v<ComputeTypeB, ck::tf32_t>)
                     {
-                        if(arg.device_name_ == "gfx942")
-                        {
-                            v_acc +=
-                                ck::type_convert<AccDataType>(ck::type_convert<ck::tf32_t>(v_a)) *
-                                ck::type_convert<AccDataType>(ck::type_convert<ck::tf32_t>(v_b));
-                        }
-                        else if(arg.device_name_ == "gfx950")
-                        {
-                            ck::bhalf_t v_a_bf16_big   = ck::type_convert<ck::bhalf_t>(v_a);
-                            ck::bhalf_t v_a_bf16_small = ck::type_convert<ck::bhalf_t>(
-                                v_a - type_convert<float>(v_a_bf16_big));
-                            ck::bhalf_t v_b_bf16_big   = ck::type_convert<ck::bhalf_t>(v_b);
-                            ck::bhalf_t v_b_bf16_small = ck::type_convert<ck::bhalf_t>(
-                                v_b - type_convert<float>(v_b_bf16_big));
-
-                            v_acc += ck::type_convert<AccDataType>(v_a_bf16_big) *
-                                         ck::type_convert<AccDataType>(v_b_bf16_small) +
-                                     ck::type_convert<AccDataType>(v_a_bf16_small) *
-                                         ck::type_convert<AccDataType>(v_b_bf16_big) +
-                                     ck::type_convert<AccDataType>(v_a_bf16_big) *
-                                         ck::type_convert<AccDataType>(v_b_bf16_big);
-                        }
-                        else
-                        {
-                            throw std::runtime_error("Unsupported device: " + arg.device_name_);
-                        }
+                        v_acc +=
+                            ck::type_convert<AccDataType>(ck::type_convert<ck::tf32_t>(v_a)) *
+                            ck::type_convert<AccDataType>(ck::type_convert<ck::tf32_t>(v_b));
                     }
                     else
                     {
