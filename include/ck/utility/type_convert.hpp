@@ -187,7 +187,15 @@ inline __host__ __device__ constexpr bf8_ocp_t type_convert<bf8_ocp_t, int>(int 
     return bf8_ocp_t{type_convert<bf8_ocp_t::data_type>(x)};
 }
 
-template <typename Y, enable_if_t<is_same_v<Y, ck::tf32_t>, bool> = false>
+enum class tf32_rounding_mode
+{
+    truncate,
+    rne
+};
+
+template <typename Y,
+          tf32_rounding_mode RM                       = tf32_rounding_mode::rne,
+          enable_if_t<is_same_v<Y, ck::tf32_t>, bool> = false>
 inline __host__ __device__ constexpr float type_convert(float x)
 {
     union
@@ -196,7 +204,18 @@ inline __host__ __device__ constexpr float type_convert(float x)
         uint32_t int32;
     } u = {x};
 
-    u.int32 = u.int32 & 0xffffe000;
+    if constexpr(RM == tf32_rounding_mode::truncate)
+    {
+        u.int32 = u.int32 & 0xffffe000;
+    }
+    else if constexpr(RM == tf32_rounding_mode::rne)
+    {
+        // use separate code to confirm hardware instructions
+        uint32_t lsb = (u.int32 >> 13) & 1;
+        u.int32      = (u.int32 + 0x0FFF + lsb);
+        u.int32 &= 0xffffe000;
+    }
+
     return u.fp32;
 }
 
