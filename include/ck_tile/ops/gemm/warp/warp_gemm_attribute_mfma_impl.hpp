@@ -61,19 +61,6 @@ enum class WGAttrCtlEnum
         DISPATCH_MFMA_(mfma_, "+a", "v", "v", "a")     \
     }
 
-// Helper function to convert float to bf16 pairs for tf32 emulation on gfx950
-// This is used to simulate tf32 using 3x bf16 MFMA: big*big + small*big + big*small
-template <index_t VecSize>
-CK_TILE_DEVICE void convert_float_to_bf16_pairs(const thread_buffer<float, VecSize>& reg_f32,
-                                                thread_buffer<bf16_t, VecSize>& reg_bf16_big,
-                                                thread_buffer<bf16_t, VecSize>& reg_bf16_small)
-{
-    static_for<0, VecSize, 1>{}([&](auto k) {
-        reg_bf16_big(k)   = type_convert<bf16_t>(reg_f32[k]);
-        reg_bf16_small(k) = type_convert<bf16_t>(reg_f32[k] - type_convert<float>(reg_bf16_big[k]));
-    });
-}
-
 // F32
 template <WGAttrCtlEnum Ctrl_ = WGAttrCtlEnum::Default_>
 struct WarpGemmAttributeMfmaImplF32F32F32M16N16K4
@@ -203,6 +190,20 @@ struct WarpGemmAttributeMfmaImplF32F32F32M32N32K2
     }
 };
 
+// Helper function to convert float to bf16 pairs for tf32 emulation on gfx950
+// This is used to simulate tf32 using 3x bf16 MFMA: big*big + small*big + big*small
+template <index_t VecSize>
+CK_TILE_DEVICE void convert_float_to_bf16_pairs(const thread_buffer<float, VecSize>& reg_f32,
+                                                thread_buffer<bf16_t, VecSize>& reg_bf16_big,
+                                                thread_buffer<bf16_t, VecSize>& reg_bf16_small)
+{
+    static_for<0, VecSize, 1>{}([&](auto k) {
+        reg_bf16_big(k)   = type_convert<bf16_t>(reg_f32[k]);
+        reg_bf16_small(k) = type_convert<bf16_t>(reg_f32[k] - type_convert<float>(reg_bf16_big[k]));
+    });
+}
+
+// TF32
 template <WGAttrCtlEnum Ctrl_ = WGAttrCtlEnum::Default_>
 struct WarpGemmAttributeMfmaImplF32F32F32M32N32K4Tf32
 {

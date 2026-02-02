@@ -108,8 +108,8 @@ struct GemmSplitKHostArgs : public ck_tile::GemmHostArgs
  * @return Execution time in milliseconds
  */
 template <typename GemmConfig,
-          typename ADataType,
-          typename BDataType,
+          typename ADataType_,
+          typename BDataType_,
           typename DsDataType,
           typename AccDataType,
           typename CDataType,
@@ -121,6 +121,11 @@ template <typename GemmConfig,
           typename CDEElementWise>
 float gemm_stage1(const GemmSplitKHostArgs& args, const ck_tile::stream_config& s)
 {
+    // Map tf32_t to float for actual data operations
+    // Original type ADataType_ is passed to pipeline and epilogue for tf32 detection
+    using ADataTypeBuf = ck_tile::if_select_v<ADataType_, ck_tile::tf32_t, float, ADataType_>;
+    using BDataTypeBuf = ck_tile::if_select_v<BDataType_, ck_tile::tf32_t, float, BDataType_>;
+
     using GemmShape = ck_tile::TileGemmShape<
         ck_tile::sequence<GemmConfig::M_Tile, GemmConfig::N_Tile, GemmConfig::K_Tile>,
         ck_tile::sequence<GemmConfig::M_Warp, GemmConfig::N_Warp, GemmConfig::K_Warp>,
@@ -160,19 +165,24 @@ float gemm_stage1(const GemmSplitKHostArgs& args, const ck_tile::stream_config& 
                                     args.stride_E);
     constexpr auto scheduler = GemmConfig::Scheduler;
 
-    using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                                       BDataType,
+    // Use original type ADataType_ for pipeline ComputeDataType (warp gemm selection)
+    using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataTypeBuf,
+                                                                       BDataTypeBuf,
                                                                        AccDataType,
                                                                        GemmShape,
                                                                        GemmUniversalTraits,
-                                                                       scheduler>;
+                                                                       scheduler,
+                                                                       ck_tile::element_wise::PassThrough,
+                                                                       ck_tile::element_wise::PassThrough,
+                                                                       ADataType_>;
 
     using GemmPipeline = typename PipelineTypeTraits<GemmConfig::Pipeline>::template GemmPipeline<
         UniversalGemmProblem>;
 
+    // Pass original types (ADataType_, BDataType_) to epilogue for tf32 auto-detection
     using GemmEpilogue =
-        ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<ADataType,
-                                                                   BDataType,
+        ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<ADataType_,
+                                                                   BDataType_,
                                                                    DsDataType,
                                                                    AccDataType,
                                                                    CDataType,
@@ -223,15 +233,15 @@ float gemm_stage1(const GemmSplitKHostArgs& args, const ck_tile::stream_config& 
     {
         std::cout << "Flushing cache..." << std::endl;
 
-        ck_tile::HostTensor<ADataType> a_m(ck_tile::host_tensor_descriptor(
+        ck_tile::HostTensor<ADataTypeBuf> a_m(ck_tile::host_tensor_descriptor(
             args.M, args.K, args.stride_A, is_row_major(ALayout{})));
-        ck_tile::HostTensor<BDataType> b_n(ck_tile::host_tensor_descriptor(
+        ck_tile::HostTensor<BDataTypeBuf> b_n(ck_tile::host_tensor_descriptor(
             args.K, args.N, args.stride_B, is_row_major(BLayout{})));
 
         auto size_a_buffer = a_m.get_element_space_size_in_bytes();
         auto size_b_buffer = b_n.get_element_space_size_in_bytes();
 
-        ck_tile::RotatingMemWrapper<ADataType, BDataType> rotating_mem(
+        ck_tile::RotatingMemWrapper<ADataTypeBuf, BDataTypeBuf> rotating_mem(
             kargs.as_ptr[0], kargs.bs_ptr[0], s.rotating_count_, size_a_buffer, size_b_buffer);
         rotating_mem.Print();
 
@@ -452,8 +462,8 @@ float gemm_splitk_two_stage(const GemmSplitKHostArgs& args, const ck_tile::strea
  * @return Average execution time in milliseconds
  */
 template <typename GemmConfig,
-          typename ADataType,
-          typename BDataType,
+          typename ADataType_,
+          typename BDataType_,
           typename DsDataType,
           typename AccDataType,
           typename CDataType,
@@ -476,6 +486,11 @@ float invoke_gemm_splitk_two_stage(ck_tile::DeviceMem& a_m_k_dev_buf,
                                    int n_repeat,
                                    bool persistent)
 {
+    // Map tf32_t to float for actual data operations (memory, etc.)
+    // Original types (ADataType_, BDataType_) are passed to gemm_splitk_two_stage for ComputeDataType
+    using ADataTypeBuf = ck_tile::if_select_v<ADataType_, ck_tile::tf32_t, float, ADataType_>;
+    using BDataTypeBuf = ck_tile::if_select_v<BDataType_, ck_tile::tf32_t, float, BDataType_>;
+
     // Calculate workspace size: kbatch * M * N elements
     const ck_tile::index_t workspace_size   = kbatch * M * N * sizeof(CDataType);
     const ck_tile::index_t workspace_stride = stride_C; // Stride for k_batch dimension
@@ -503,11 +518,12 @@ float invoke_gemm_splitk_two_stage(ck_tile::DeviceMem& a_m_k_dev_buf,
     float ave_time;
     ck_tile::stream_config config{nullptr, true, 1, n_warmup, n_repeat, true, true, 50};
 
+    // Pass original types (ADataType_, BDataType_) to let gemm_splitk_two_stage handle tf32 mapping
     if(persistent)
     {
         ave_time = gemm_splitk_two_stage<GemmConfig,
-                                         ADataType,
-                                         BDataType,
+                                         ADataType_,
+                                         BDataType_,
                                          DsDataType,
                                          AccDataType,
                                          CDataType,
@@ -521,8 +537,8 @@ float invoke_gemm_splitk_two_stage(ck_tile::DeviceMem& a_m_k_dev_buf,
     else
     {
         ave_time = gemm_splitk_two_stage<GemmConfig,
-                                         ADataType,
-                                         BDataType,
+                                         ADataType_,
+                                         BDataType_,
                                          DsDataType,
                                          AccDataType,
                                          CDataType,
@@ -536,7 +552,7 @@ float invoke_gemm_splitk_two_stage(ck_tile::DeviceMem& a_m_k_dev_buf,
 
     std::size_t flop = std::size_t(2) * M * N * K;
     std::size_t num_byte =
-        sizeof(ADataType) * M * K + sizeof(BDataType) * N * K + sizeof(CDataType) * M * N;
+        sizeof(ADataTypeBuf) * M * K + sizeof(BDataTypeBuf) * N * K + sizeof(CDataType) * M * N;
     float tflops     = static_cast<float>(flop) / 1.E9 / ave_time;
     float gb_per_sec = num_byte / 1.E6 / ave_time;
 
@@ -545,8 +561,8 @@ float invoke_gemm_splitk_two_stage(ck_tile::DeviceMem& a_m_k_dev_buf,
               << " kbatch=" << kbatch << " WorkspaceSize=" << workspace_size << " bytes"
               << " A_Layout=" << ALayout::name << " B_Layout =" << BLayout::name
               << " C_Layout=" << CLayout::name
-              << " A_Type=" << ck_tile::DataTypeTraits<ADataType>::name
-              << " B_Type=" << ck_tile::DataTypeTraits<BDataType>::name
+              << " A_Type=" << ck_tile::DataTypeTraits<ADataTypeBuf>::name
+              << " B_Type=" << ck_tile::DataTypeTraits<BDataTypeBuf>::name
               << " C_Type=" << ck_tile::DataTypeTraits<CDataType>::name
               << " StructuredSparsity=" << (GemmConfig::UseStructuredSparsity ? "on" : "off")
               << " Persistent=" << (persistent ? "on" : "off") << " : " << ave_time << " ms, "
@@ -557,9 +573,9 @@ float invoke_gemm_splitk_two_stage(ck_tile::DeviceMem& a_m_k_dev_buf,
 
 // Two-stage implementation of run_gemm_example_with_layouts
 template <typename GemmConfig,
-          typename ADataType,
-          typename BDataType = ADataType,
-          typename CDataType = ADataType,
+          typename ADataType_,
+          typename BDataType_ = ADataType_,
+          typename CDataType_ = ADataType_,
           typename ALayout,
           typename BLayout,
           typename CLayout>
@@ -568,7 +584,13 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
                                             const BLayout b_layout                  = BLayout{},
                                             [[maybe_unused]] const CLayout c_layout = CLayout{})
 {
-    using AccDataType = typename GemmTypeConfig<ADataType, BDataType, CDataType>::AccDataType;
+    // Use GemmTypeConfig to get actual data types for tensor operations
+    // This handles tf32 -> float mapping for host tensors and device buffers
+    using TypeConfig  = GemmTypeConfig<ADataType_, BDataType_, CDataType_>;
+    using ADataType   = typename TypeConfig::ADataType;
+    using BDataType   = typename TypeConfig::BDataType;
+    using CDataType   = typename TypeConfig::CDataType;
+    using AccDataType = typename TypeConfig::AccDataType;
 
     ck_tile::index_t M = arg_parser.get_int("m");
     ck_tile::index_t N = arg_parser.get_int("n");
@@ -681,9 +703,10 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
 
     std::cout << "Using Workspace Split-K Mode (Two-Stage with Reduction)" << std::endl;
     // Use the new two-stage approach
+    // Pass original types (ADataType_, etc.) to let the pipeline handle tf32 -> float mapping
     invoke_gemm_splitk_two_stage<GemmConfig,
-                                 ADataType,
-                                 BDataType,
+                                 ADataType_,
+                                 BDataType_,
                                  ck_tile::tuple<>,
                                  AccDataType,
                                  CDataType,
@@ -783,11 +806,11 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
     return pass;
 }
 
+// APrecType and BPrecType can be tf32_t for TF32 mode - auto-detection happens internally
 template <typename GemmConfig,
           typename APrecType,
-          typename BPrecType       = APrecType,
-          typename CPrecType       = APrecType,
-          typename ComputeDataType = APrecType>
+          typename BPrecType = APrecType,
+          typename CPrecType = APrecType>
 int run_gemm_example_prec_type(std::string a_layout,
                                std::string b_layout,
                                ck_tile::ArgParser& arg_parser)
@@ -898,12 +921,10 @@ int run_gemm_example(ck_tile::ArgParser& arg_parser)
 #ifdef CK_GFX950_SUPPORT
     else if(data_type == "tf32")
     {
-        // TF32 uses template-specialized GemmConfig with correct tile config
         return run_gemm_example_prec_type<GemmConfig<ck_tile::tf32_t>,
-                                          float,
-                                          float,
-                                          float,
-                                          ck_tile::tf32_t>(a_layout, b_layout, arg_parser);
+                                          ck_tile::tf32_t,
+                                          ck_tile::tf32_t,
+                                          float>(a_layout, b_layout, arg_parser);
     }
 #endif
     else if(data_type == "fp8")

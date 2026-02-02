@@ -255,26 +255,33 @@ struct UniversalWeightPreshufflePipelineAgBgCrPolicy
     {
         using BlockWarps = typename Problem::BlockGemmShape::BlockWarps;
         using WarpTile   = typename Problem::BlockGemmShape::WarpTile;
-        using BTypeToUse =
-            std::conditional_t<std::is_same_v<typename Problem::BDataType, ck_tile::pk_int4_t>,
-                               typename Problem::ADataType,
-                               typename Problem::BDataType>;
+
+        // Use ComputeDataType to detect tf32 mode for warp gemm selection
+        using ComputeDataType = remove_cvref_t<typename Problem::ComputeDataType>;
+        using ADataType       = remove_cvref_t<typename Problem::ADataType>;
+        using BDataType       = remove_cvref_t<typename Problem::BDataType>;
+
         constexpr index_t WaveSize = get_warp_size();
         constexpr index_t KLane    = WarpTile::at(I2) * WarpTile::at(I0) / WaveSize;
-        using BDataType            = typename Problem::BDataType;
         constexpr index_t KLaneBytes =
             KLane / numeric_traits<BDataType>::PackedSize * sizeof(BDataType);
         constexpr auto NumAccess = static_cast<WGAttrNumAccessEnum>(max(1, KLaneBytes / 16));
-        using WarpGemm           = WarpGemmDispatcher<typename Problem::ADataType,
-                                                      BTypeToUse,
-                                                      typename Problem::CDataType,
-                                                      WarpTile::at(I0),
-                                                      WarpTile::at(I1),
-                                                      WarpTile::at(I2),
-                                                      Problem::TransposeC,
-                                                      false,
-                                                      false,
-                                                      NumAccess>;
+
+        // For tf32 mode, use tf32_t for warp gemm; otherwise use original types
+        using WarpGemm =
+            WarpGemmDispatcher<if_select_v<ComputeDataType, tf32_t, tf32_t, ADataType>,
+                               if_select_v<ComputeDataType,
+                                           tf32_t,
+                                           tf32_t,
+                                           if_select_v<BDataType, pk_int4_t, ADataType, BDataType>>,
+                               typename Problem::CDataType,
+                               WarpTile::at(I0),
+                               WarpTile::at(I1),
+                               WarpTile::at(I2),
+                               Problem::TransposeC,
+                               false,
+                               false,
+                               NumAccess>;
 
         using BlockWeightPreshufflePolicy =
             BlockWeightPreshuffleASmemBSmemCRegV1CustomPolicy<typename Problem::ADataType,

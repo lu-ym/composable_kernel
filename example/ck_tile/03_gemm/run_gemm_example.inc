@@ -98,6 +98,8 @@ void permute_tensor_b(Tensor& tensor)
     }
 }
 
+// ADataType/BDataType are original types (e.g., tf32_t) for kernel selection
+// They are passed to Invoker for epilogue auto-detection of tf32
 template <typename GemmConfig,
           typename Invoker,
           typename ADataType,
@@ -109,8 +111,7 @@ template <typename GemmConfig,
           typename BLayout,
           typename DsLayout,
           typename CLayout,
-          typename ComputeDataType = ADataType,
-          typename CDEElementWise  = ck_tile::element_wise::PassThrough>
+          typename CDEElementWise = ck_tile::element_wise::PassThrough>
 float invoke_gemm(ck_tile::DeviceMem& a_m_k_dev_buf,
                   ck_tile::DeviceMem& b_k_n_dev_buf,
                   ck_tile::DeviceMem& c_m_n_dev_buf,
@@ -152,8 +153,7 @@ float invoke_gemm(ck_tile::DeviceMem& a_m_k_dev_buf,
                                           DsLayout,
                                           CLayout,
                                           true,
-                                          CDEElementWise,
-                                          ComputeDataType>(
+                                          CDEElementWise>(
             args,
             ck_tile::stream_config{
                 nullptr, true, 1, n_warmup, n_repeat, true, flush_cache, rotating_count});
@@ -171,8 +171,7 @@ float invoke_gemm(ck_tile::DeviceMem& a_m_k_dev_buf,
                                           DsLayout,
                                           CLayout,
                                           false,
-                                          CDEElementWise,
-                                          ComputeDataType>(
+                                          CDEElementWise>(
             args,
             ck_tile::stream_config{
                 nullptr, true, 1, n_warmup, n_repeat, true, flush_cache, rotating_count});
@@ -209,21 +208,28 @@ std::tuple<ck_tile::index_t, ck_tile::index_t, ck_tile::index_t> inline parse_ge
     return std::make_tuple(M, N, K);
 }
 
+// ADataType_ and BDataType_ are original types (e.g., tf32_t for TF32 mode)
+// They are passed through invoke_gemm to invoker for tf32 auto-detection
 template <typename GemmConfig,
           typename Invoker,
-          typename ADataType,
-          typename BDataType       = ADataType,
-          typename CDataType       = ADataType,
-          typename ALayout         = ck_tile::tensor_layout::gemm::RowMajor,
-          typename BLayout         = ck_tile::tensor_layout::gemm::ColumnMajor,
-          typename CLayout         = ck_tile::tensor_layout::gemm::RowMajor,
-          typename ComputeDataType = ADataType>
+          typename ADataType_,
+          typename BDataType_ = ADataType_,
+          typename CDataType_ = ADataType_,
+          typename ALayout,
+          typename BLayout,
+          typename CLayout>
 int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
                                   const ALayout a_layout                  = ALayout{},
                                   const BLayout b_layout                  = BLayout{},
                                   [[maybe_unused]] const CLayout c_layout = CLayout{})
 {
-    using AccDataType = typename GemmTypeConfig<ADataType, BDataType, CDataType>::AccDataType;
+    // Use GemmTypeConfig to get actual data types for tensor operations
+    // This handles tf32 -> float mapping for host tensors and device buffers
+    using TypeConfig  = GemmTypeConfig<ADataType_, BDataType_, CDataType_>;
+    using ADataType   = typename TypeConfig::ADataType;
+    using BDataType   = typename TypeConfig::BDataType;
+    using CDataType   = typename TypeConfig::CDataType;
+    using AccDataType = typename TypeConfig::AccDataType;
 
     ck_tile::index_t M = arg_parser.get_int("m");
     ck_tile::index_t N = arg_parser.get_int("n");
@@ -343,32 +349,32 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
     c_m_n_dev_buf.SetZero();
     c_m_n_dev_result.SetZero();
 
+    // Pass original types (ADataType_, BDataType_) to invoke_gemm for epilogue auto-detection
     float ave_time = invoke_gemm<GemmConfig,
                                  Invoker,
-                                 ADataType,
-                                 BDataType,
+                                 ADataType_,
+                                 BDataType_,
                                  ck_tile::tuple<>,
                                  AccDataType,
                                  CDataType,
                                  ALayout,
                                  BLayout,
                                  ck_tile::tuple<>,
-                                 CLayout,
-                                 ComputeDataType>(a_m_k_dev_buf,
-                                                  b_k_n_dev_buf,
-                                                  c_m_n_dev_buf,
-                                                  M,
-                                                  N,
-                                                  K,
-                                                  stride_A,
-                                                  stride_B,
-                                                  stride_C,
-                                                  kbatch,
-                                                  n_warmup,
-                                                  n_repeat,
-                                                  persistent,
-                                                  flush_cache,
-                                                  rotating_count);
+                                 CLayout>(a_m_k_dev_buf,
+                                          b_k_n_dev_buf,
+                                          c_m_n_dev_buf,
+                                          M,
+                                          N,
+                                          K,
+                                          stride_A,
+                                          stride_B,
+                                          stride_C,
+                                          kbatch,
+                                          n_warmup,
+                                          n_repeat,
+                                          persistent,
+                                          flush_cache,
+                                          rotating_count);
 
     c_m_n_dev_buf.FromDevice(c_m_n_dev_result.data());
 
@@ -398,7 +404,8 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
 
     if(arg_parser.get_int("v") == 1)
     {
-        ck_tile::reference_gemm<ADataType, BDataType, AccDataType, CDataType, ComputeDataType>(
+        // Use original types (ADataType_, BDataType_) for reference gemm - it handles tf32 internally
+        ck_tile::reference_gemm<ADataType_, BDataType_, AccDataType, CDataType>(
             a_m_k, b_k_n, c_m_n_ref);
         const float max_accumulated_value =
             *std::max_element(c_m_n_ref.mData.begin(), c_m_n_ref.mData.end());
@@ -426,14 +433,14 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
         BDataType* d_B = static_cast<BDataType*>(b_k_n_dev_buf.GetDeviceBuffer());
         CDataType* d_C = static_cast<CDataType*>(c_m_n_gpu_buf_ref.GetDeviceBuffer());
 
-        ck_tile::reference_gemm_gpu<ADataType,
-                                    BDataType,
+        // Use original types (ADataType_, BDataType_) for reference gemm - it handles tf32 internally
+        ck_tile::reference_gemm_gpu<ADataType_,
+                                    BDataType_,
                                     AccDataType,
                                     CDataType,
                                     ALayout,
                                     BLayout,
-                                    CLayout,
-                                    ComputeDataType>(
+                                    CLayout>(
             d_A, d_B, d_C, M, N, K, stride_A, stride_B, stride_C);
 
         c_m_n_gpu_buf_ref.FromDevice(c_m_n_ref.data());
